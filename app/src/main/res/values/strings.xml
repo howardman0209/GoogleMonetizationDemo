@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Google monetization</string>
+    <string name="label_products_title">Products</string>
+    <string name="label_no_ads">No ads</string>
+    <string name="label_restore_purchase">restore purchase</string>
+    <string name="label_feature_after_ads">Feature after ads</string>
+    <string name="label_use_1_coin">Use 1 coin</string>
+    <string name="label_coin_display">Coin x %1$d</string>
 </resources>

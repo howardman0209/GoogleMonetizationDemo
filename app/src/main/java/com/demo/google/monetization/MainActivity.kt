@@ -11,6 +11,7 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingResult
+import com.android.billingclient.api.ConsumeParams
 import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
@@ -30,7 +31,6 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "@MainActivity"
         private const val MAXIMUM_BILLING_SERVICE_CONNECTION_RETRY_COUNT = 3
-        private const val IAP_PRODUCT_ID_PREFIX = "iap_product_"
         private const val GOOGLE_PLAY_MONETIZATION_BASE64_PUBLIC_KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqgRKRX8YBn2seOegQHB+kzmwsg+MKMKXk9rBlG1X0DuZj68VNcoMtjsJXaSLttzIbYtkNUZgUTQiCMWm39T9X2Cuc8wQsPRmhT8cqaHN9erDnL/WM4bWONiBVcWnsVCDXMws1GHdFmBPFGZWxm9gjn+wXO7mPyY/yOna5BiKEfyRHwFasU/TgxjSoloqVeeTG7HWrc545G0FGEAqhBtJt85hN4KCvbAE+OQ0AVKZkHH8MJa3pRrhqrDn07Xyzi/DdWT4zmWSY9xYLaceLhoVXoXusfZ18ZHwm9z5aM+T8zH7FTNJnXG92q8tFajNmwWJCCo6X6Fg9cEQh6x1Nm7eFQIDAQAB"
     }
 
@@ -107,13 +107,28 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        binding.btnFeatureAfterAds.setOnClickListener {
+
+        }
+
+        binding.btnUseCoin.setOnClickListener {
+            updateCoinsDisplay(Preference.decrementAndGetNumberOfCoin(applicationContext, 1))
+        }
+
+        updateCoinsDisplay(Preference.getNumberOfCoin(applicationContext))
+
         establishBillingServiceConnection()
     }
 
-    private fun checkFeatures(acquiredFeatureA: Boolean? = null, acquiredFeatureB: Boolean? = null) {
+    private fun updateNoAdsBadge(noAds: Boolean) {
         lifecycleScope.launch(Dispatchers.Main) {
-            binding.tvFeatureA.visibility = if (acquiredFeatureA ?: Preference.getFeatureAAccessible(applicationContext)) View.VISIBLE else View.GONE
-            binding.tvFeatureB.visibility = if (acquiredFeatureB ?: Preference.getFeatureBAccessible(applicationContext)) View.VISIBLE else View.GONE
+            binding.tvNoAds.visibility = if (noAds) View.VISIBLE else View.GONE
+        }
+    }
+
+    private fun updateCoinsDisplay(numberOfCoin: Int) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            binding.tvCoins.text = String.format(getString(R.string.label_coin_display), numberOfCoin)
         }
     }
 
@@ -161,12 +176,13 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.Main) {
             queryProductDetails()
             val purchases = queryPurchases()
-            val acquiredFeatureA = purchases.find { it.purchaseState == Purchase.PurchaseState.PURCHASED && it.products.any { productId -> productId == "${IAP_PRODUCT_ID_PREFIX}0" } } != null
-            Preference.saveFeatureAAccessible(applicationContext, acquiredFeatureA)
-            val acquiredFeatureB = purchases.find { it.purchaseState == Purchase.PurchaseState.PURCHASED && it.products.any { productId -> productId == "${IAP_PRODUCT_ID_PREFIX}1" } } != null
-            Preference.saveFeatureBAccessible(applicationContext, acquiredFeatureB)
+            val purchasedNoAds = purchases.any {
+                it.purchaseState == Purchase.PurchaseState.PURCHASED
+                        && it.products.any { productId -> productId == InAppProduct.REMOVE_ADS.productId }
+            }
+            Preference.saveNoAds(applicationContext, purchasedNoAds)
 
-            checkFeatures(acquiredFeatureA, acquiredFeatureB)
+            updateNoAdsBadge(purchasedNoAds)
         }
     }
 
@@ -187,9 +203,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private suspend fun queryProductDetails() {
-        val productList = List(2) {
+        val productList = InAppProduct.entries.map {
             QueryProductDetailsParams.Product.newBuilder()
-                .setProductId("$IAP_PRODUCT_ID_PREFIX$it")
+                .setProductId(it.productId)
                 .setProductType(BillingClient.ProductType.INAPP)
                 .build()
         }
@@ -244,35 +260,56 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun grantingEntitlement(purchase: Purchase) {
-        fun unlockPremiumFeature() {
-            Log.d(TAG, "unlockPremiumFeature")
-            val acquiredFeatureA = purchase.products.any { it == "${IAP_PRODUCT_ID_PREFIX}0" }
-            if (acquiredFeatureA) {
-                Preference.saveFeatureAAccessible(applicationContext, true)
-                checkFeatures(true, null)
-                Log.d(TAG, "feature A unlocked")
-            }
-
-            val acquiredFeatureB = purchase.products.any { it == "${IAP_PRODUCT_ID_PREFIX}1" }
-            if (acquiredFeatureB) {
-                Preference.saveFeatureBAccessible(applicationContext, true)
-                checkFeatures(null, true)
-                Log.d(TAG, "feature B unlocked")
+        fun unlockNoAds() {
+            Log.d(TAG, "unlockNoAds")
+            val purchasedNoAds = purchase.products.any { it == InAppProduct.REMOVE_ADS.productId }
+            if (purchasedNoAds) {
+                Preference.saveNoAds(applicationContext, true)
+                updateNoAdsBadge(true)
+                Log.d(TAG, "No ads unlocked")
             }
         }
 
-        if (purchase.isAcknowledged) {
-            unlockPremiumFeature()
-            return
+        fun grantCoins() {
+            Log.d(TAG, "grantCoins")
+            val purchasedNoAds = purchase.products.any { it == InAppProduct.COIN_X2.productId }
+            if (purchasedNoAds) {
+                updateCoinsDisplay(Preference.incrementAndGetNumberOfCoin(applicationContext, 2))
+                Log.d(TAG, "coins added")
+            }
         }
 
-        val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
-            .setPurchaseToken(purchase.purchaseToken)
-            .build()
+        val isConsumable = purchase.products.firstOrNull()?.let {
+            val inAppProduct = InAppProduct.byProductId(it)
+            inAppProduct.isConsumable
+        } == true
 
-        billingClient.acknowledgePurchase(acknowledgeParams) { billingResult ->
-            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                unlockPremiumFeature()
+        // check purchased product consumable
+        if (isConsumable) {
+            val consumeParams = ConsumeParams.newBuilder()
+                .setPurchaseToken(purchase.purchaseToken)
+                .build()
+
+            billingClient.consumeAsync(consumeParams) { billingResult, _ ->
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    grantCoins()
+                }
+            }
+        } else {
+            // check purchase is already acknowledged
+            if (purchase.isAcknowledged) {
+                unlockNoAds()
+                return
+            }
+
+            val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
+                .setPurchaseToken(purchase.purchaseToken)
+                .build()
+
+            billingClient.acknowledgePurchase(acknowledgeParams) { billingResult ->
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    unlockNoAds()
+                }
             }
         }
     }

@@ -6,35 +6,45 @@ import androidx.core.content.edit
 
 object Preference {
     private const val PREFERENCE_FILENAME = "PREF"
-    private const val PREF_KEY_FEATURE_A = "FeatureA"
-    private const val PREF_KEY_FEATURE_B = "FeatureB"
+    private const val PREF_KEY_NO_ADS = "NoAds"
+    private const val PREF_KEY_NUMBER_OF_COIN = "NumberOfCoin"
 
     private fun getPref(context: Context): SharedPreferences {
         return context.getSharedPreferences(PREFERENCE_FILENAME, Context.MODE_PRIVATE)
     }
 
-    fun saveFeatureAAccessible(context: Context, accessible: Boolean) {
+    fun saveNoAds(context: Context, accessible: Boolean) {
         val pref = getPref(context)
         pref.edit {
-            putBoolean(PREF_KEY_FEATURE_A, accessible)
+            putBoolean(PREF_KEY_NO_ADS, accessible)
         }
     }
 
-    fun getFeatureAAccessible(context: Context): Boolean {
+    fun getNoAds(context: Context): Boolean {
         val pref = getPref(context)
-        return pref.getBoolean(PREF_KEY_FEATURE_A, false)
+        return pref.getBoolean(PREF_KEY_NO_ADS, false)
     }
 
-    fun saveFeatureBAccessible(context: Context, accessible: Boolean) {
+    fun getNumberOfCoin(context: Context): Int {
         val pref = getPref(context)
+        return pref.getInt(PREF_KEY_NUMBER_OF_COIN, 0)
+    }
+
+    fun incrementAndGetNumberOfCoin(context: Context, increment: Int): Int {
+        val pref = getPref(context)
+        val current = pref.getInt(PREF_KEY_NUMBER_OF_COIN, 0)
         pref.edit {
-            putBoolean(PREF_KEY_FEATURE_B, accessible)
+            putInt(PREF_KEY_NUMBER_OF_COIN, current + increment)
         }
+        return current + increment
     }
 
-    fun getFeatureBAccessible(context: Context): Boolean {
+    fun decrementAndGetNumberOfCoin(context: Context, decrement: Int): Int {
         val pref = getPref(context)
-        return pref.getBoolean(PREF_KEY_FEATURE_B, false)
+        val current = pref.getInt(PREF_KEY_NUMBER_OF_COIN, 0)
+        pref.edit {
+            putInt(PREF_KEY_NUMBER_OF_COIN, current - decrement)
+        }
+        return current - decrement
     }
-
 }

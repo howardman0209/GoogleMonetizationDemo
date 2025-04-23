@@ -100,8 +100,7 @@ class MainActivity : AppCompatActivity() {
                         grantingEntitlement(purchase)
                     }
                 }
-                showLoadingIndicator(false)
-                withContext(Dispatchers.Main) {
+                showLoadingIndicator(false) {
                     Toast.makeText(this@MainActivity, "Purchase restored", Toast.LENGTH_SHORT).show()
                 }
             }
@@ -320,7 +319,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun showLoadingIndicator(show: Boolean) {
+    private fun showLoadingIndicator(show: Boolean, onDismiss: (() -> Unit)? = null) {
         lifecycleScope.launch(Dispatchers.Main) {
             if (show) {
                 binding.loadingIndicator.visibility = View.VISIBLE
@@ -334,6 +333,7 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     binding.loadingIndicator.visibility = View.GONE
                 }
+                onDismiss?.invoke()
             }
         }
     }

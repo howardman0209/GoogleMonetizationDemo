@@ -3,7 +3,14 @@
     <string name="label_products_title">Products</string>
     <string name="label_no_ads">No ads</string>
     <string name="label_restore_purchase">restore purchase</string>
-    <string name="label_feature_after_ads">Feature after ads</string>
+    <string name="label_feature_after_ads">Play ads to get 1 coin</string>
     <string name="label_use_1_coin">Use 1 coin</string>
     <string name="label_coin_display">Coin x %1$d</string>
+
+    <string name="toast_message_purchase_cannot_be_verified">Purchase cannot be verified</string>
+    <string name="toast_message_payment_not_success">Payment not success</string>
+    <string name="toast_message_purchase_restored">Purchase restored</string>
+    <string name="toast_message_not_enough_coin">Not enough coin</string>
+    <string name="toast_message_coin_granted">Coin granted</string>
+    <string name="toast_message_fail_to_load_ads">Fail to load ads</string>
 </resources>

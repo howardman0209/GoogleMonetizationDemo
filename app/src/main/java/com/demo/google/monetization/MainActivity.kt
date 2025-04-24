@@ -22,9 +22,15 @@ import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
 import com.demo.google.monetization.databinding.ActivityMainBinding
+import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
 import com.google.android.gms.ads.RequestConfiguration
+import com.google.android.gms.ads.rewarded.RewardItem
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -43,6 +49,7 @@ class MainActivity : AppCompatActivity() {
     private var progressStart = 0L
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
     private val googleMobileAdsConsentManager by lazy { GoogleMobileAdsConsentManager.getInstance(applicationContext) }
+    private var loadedRewardedAd: RewardedAd? = null
 
     private val productListAdapter = ProductListAdapter(object : ProductListAdapter.ProductViewListener {
         override fun onProductSelected(productDetails: ProductDetails) {
@@ -70,13 +77,13 @@ class MainActivity : AppCompatActivity() {
                 if (verified) {
                     grantingEntitlement(purchase)
                 } else {
-                    showToast("Purchase cannot be verified")
+                    showToast(getString(R.string.toast_message_purchase_cannot_be_verified))
                 }
             } ?: {
-                showToast("Payment not success")
+                showToast(getString(R.string.toast_message_payment_not_success))
             }
         } else {
-            showToast("Payment not success")
+            showToast(getString(R.string.toast_message_payment_not_success))
         }
     }
 
@@ -108,18 +115,26 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
                 showLoadingIndicator(false) {
-                    Toast.makeText(this@MainActivity, "Purchase restored", Toast.LENGTH_SHORT).show()
+                    showToast(getString(R.string.toast_message_purchase_restored))
                 }
             }
         }
 
         binding.btnFeatureAfterAds.setOnClickListener {
-
+            showRewardedVideo { rewardItem ->
+                Log.d(TAG, "rewardItem: $rewardItem")
+                val rewardAmount = rewardItem.amount
+                val rewardType = rewardItem.type
+                Log.d(TAG, "rewardType: $rewardType, rewardAmount: $rewardAmount")
+                updateCoinsDisplay(Preference.incrementAndGetNumberOfCoin(applicationContext, 1))
+                showToast(getString(R.string.toast_message_coin_granted))
+                Log.d(TAG, "User earned the reward.")
+            }
         }
 
         binding.btnUseCoin.setOnClickListener {
             if (Preference.getNumberOfCoin(applicationContext) < 1) {
-                Toast.makeText(this@MainActivity, "Not enough coins", Toast.LENGTH_SHORT).show()
+                showToast(getString(R.string.toast_message_not_enough_coin))
                 return@setOnClickListener
             }
 
@@ -356,6 +371,7 @@ class MainActivity : AppCompatActivity() {
             MobileAds.initialize(this@MainActivity) {}
             withContext(Dispatchers.Main) {
                 loadBannerAd()
+                loadRewardedAd()
             }
         }
     }
@@ -376,6 +392,70 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.Main) {
             Log.d(TAG, "remove banner ad")
             binding.bannerAdView.visibility = View.GONE
+        }
+    }
+
+    private fun loadRewardedAd(onCompleted: ((ad: RewardedAd?) -> Unit)? = null) {
+        if (loadedRewardedAd == null) {
+            val adRequest = AdRequest.Builder().build()
+
+            RewardedAd.load(
+                this,
+                SAMPLE_REWARDED_VIDEO_AD_UNIT_AD,
+                adRequest,
+                object : RewardedAdLoadCallback() {
+                    override fun onAdFailedToLoad(adError: LoadAdError) {
+                        Log.d(TAG, adError.message)
+                        loadedRewardedAd = null
+                        onCompleted?.invoke(null)
+                    }
+
+                    override fun onAdLoaded(ad: RewardedAd) {
+                        Log.d(TAG, "Ad was loaded.")
+                        loadedRewardedAd = ad
+                        onCompleted?.invoke(ad)
+                    }
+                },
+            )
+        }
+    }
+
+    private fun showRewardedVideo(onRewardGrant: (rewardItem: RewardItem) -> Unit) {
+        lifecycleScope.launch(Dispatchers.Main) {
+            val loadedAd = loadedRewardedAd
+            if (loadedAd != null) {
+                loadedAd.fullScreenContentCallback =
+                    object : FullScreenContentCallback() {
+                        override fun onAdDismissedFullScreenContent() {
+                            Log.d(TAG, "Ad was dismissed.")
+                            // Don't forget to set the ad reference to null so you
+                            // don't show the ad a second time.
+                            loadedRewardedAd = null
+                            if (googleMobileAdsConsentManager.canRequestAds) {
+                                loadRewardedAd()
+                            }
+                        }
+
+                        override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                            Log.d(TAG, "Ad failed to show.")
+                            // Don't forget to set the ad reference to null so you
+                            // don't show the ad a second time.
+                            loadedRewardedAd = null
+                        }
+
+                        override fun onAdShowedFullScreenContent() {
+                            Log.d(TAG, "Ad showed fullscreen content.")
+                            // Called when ad is dismissed.
+                        }
+                    }
+
+                loadedAd.show(this@MainActivity) { rewardItem ->
+                    // Handle the reward.
+                    onRewardGrant.invoke(rewardItem)
+                }
+            } else {
+                showToast(getString(R.string.toast_message_fail_to_load_ads))
+            }
         }
     }
 

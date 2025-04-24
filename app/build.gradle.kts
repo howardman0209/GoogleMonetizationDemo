@@ -67,4 +67,6 @@ dependencies {
 
     // Google Play billing (in app purchase)
     implementation(libs.com.android.billingclient.ktx)
+    // Google AdMod
+    implementation(libs.play.services.ads)
 }

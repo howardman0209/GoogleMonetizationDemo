@@ -1,5 +1,6 @@
 package com.demo.google.monetization
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -21,11 +22,15 @@ import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
 import com.demo.google.monetization.databinding.ActivityMainBinding
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.MobileAds
+import com.google.android.gms.ads.RequestConfiguration
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicBoolean
 
 class MainActivity : AppCompatActivity() {
     companion object {
@@ -36,6 +41,8 @@ class MainActivity : AppCompatActivity() {
 
     val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
     private var progressStart = 0L
+    private val isMobileAdsInitializeCalled = AtomicBoolean(false)
+    private val googleMobileAdsConsentManager by lazy { GoogleMobileAdsConsentManager.getInstance(applicationContext) }
 
     private val productListAdapter = ProductListAdapter(object : ProductListAdapter.ProductViewListener {
         override fun onProductSelected(productDetails: ProductDetails) {
@@ -122,6 +129,22 @@ class MainActivity : AppCompatActivity() {
         updateCoinsDisplay(Preference.getNumberOfCoin(applicationContext))
 
         establishBillingServiceConnection()
+
+        // Ads
+        googleMobileAdsConsentManager.gatherConsent(this) { error ->
+            if (error != null) {
+                // Consent not obtained in current session.
+                Log.d(TAG, "${error.errorCode}: ${error.message}")
+            }
+
+            if (googleMobileAdsConsentManager.canRequestAds) {
+                initializeMobileAdsSdk()
+            }
+        }
+
+        if (googleMobileAdsConsentManager.canRequestAds) {
+            initializeMobileAdsSdk()
+        }
     }
 
     private fun updateNoAdsBadge(noAds: Boolean) {
@@ -270,14 +293,15 @@ class MainActivity : AppCompatActivity() {
             if (purchasedNoAds) {
                 Preference.saveNoAds(applicationContext, true)
                 updateNoAdsBadge(true)
+                removeBannerAd()
                 Log.d(TAG, "No ads unlocked")
             }
         }
 
         fun grantCoins() {
             Log.d(TAG, "grantCoins")
-            val purchasedNoAds = purchase.products.any { it == InAppProduct.COIN_X2.productId }
-            if (purchasedNoAds) {
+            val purchasedCoins = purchase.products.any { it == InAppProduct.COIN_X2.productId }
+            if (purchasedCoins) {
                 updateCoinsDisplay(Preference.incrementAndGetNumberOfCoin(applicationContext, 2))
                 Log.d(TAG, "coins added")
             }
@@ -315,6 +339,43 @@ class MainActivity : AppCompatActivity() {
                     unlockNoAds()
                 }
             }
+        }
+    }
+
+    private fun initializeMobileAdsSdk() {
+        if (isMobileAdsInitializeCalled.getAndSet(true)) {
+            return
+        }
+
+        // Set your test devices.
+        MobileAds.setRequestConfiguration(
+            RequestConfiguration.Builder().setTestDeviceIds(listOf(TEST_DEVICE_HASHED_ID)).build()
+        )
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            MobileAds.initialize(this@MainActivity) {}
+            withContext(Dispatchers.Main) {
+                loadBannerAd()
+            }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun loadBannerAd() {
+        lifecycleScope.launch(Dispatchers.Main) {
+            if (!Preference.getNoAds(applicationContext)) {
+                Log.d(TAG, "load ad")
+                val adRequest = AdRequest.Builder().build()
+                binding.bannerAdView.visibility = View.VISIBLE
+                binding.bannerAdView.loadAd(adRequest)
+            }
+        }
+    }
+
+    private fun removeBannerAd() {
+        lifecycleScope.launch(Dispatchers.Main) {
+            Log.d(TAG, "remove banner ad")
+            binding.bannerAdView.visibility = View.GONE
         }
     }
 

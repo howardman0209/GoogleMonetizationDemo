@@ -111,6 +111,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnUseCoin.setOnClickListener {
+            if (Preference.getNumberOfCoin(applicationContext) < 1) {
+                Toast.makeText(this@MainActivity, "Not enough coins", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+
             updateCoinsDisplay(Preference.decrementAndGetNumberOfCoin(applicationContext, 1))
         }
 

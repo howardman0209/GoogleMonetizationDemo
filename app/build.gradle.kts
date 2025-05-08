@@ -23,6 +23,18 @@ android {
         setProperty("archivesBaseName", "$applicationId-v$versionName")
     }
 
+    flavorDimensions("environment")
+    productFlavors {
+        create("prod") {
+            dimension = "environment"
+        }
+
+        create("demo") {
+            dimension = "environment"
+            versionNameSuffix = "-preprod"
+        }
+    }
+
     signingConfigs {
         register("release") {
             // add a gradle.properties file at ~/.gradle with following content

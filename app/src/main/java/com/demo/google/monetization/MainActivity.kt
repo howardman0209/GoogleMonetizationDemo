@@ -1,6 +1,5 @@
 package com.demo.google.monetization
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import android.util.Log
 import android.view.View
@@ -24,6 +23,8 @@ import com.android.billingclient.api.queryPurchasesAsync
 import com.demo.google.monetization.databinding.ActivityMainBinding
 import com.google.android.gms.ads.AdError
 import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
 import com.google.android.gms.ads.FullScreenContentCallback
 import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.MobileAds
@@ -374,14 +375,20 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    @SuppressLint("MissingPermission")
     private fun loadBannerAd() {
         lifecycleScope.launch(Dispatchers.Main) {
             if (!Preference.getNoAds(applicationContext)) {
                 Log.d(TAG, "load ad")
                 val adRequest = AdRequest.Builder().build()
-                binding.bannerAdView.visibility = View.VISIBLE
-                binding.bannerAdView.loadAd(adRequest)
+                // Create a new ad view.
+                val adView = AdView(this@MainActivity)
+                adView.adUnitId = BuildConstants.BANNER_AD_UNIT_AD
+                adView.setAdSize(AdSize.BANNER)
+
+                // Replace ad container with new ad view.
+                binding.bannerAdViewContainer.removeAllViews()
+                binding.bannerAdViewContainer.addView(adView)
+                adView.loadAd(adRequest)
             }
         }
     }
@@ -389,7 +396,7 @@ class MainActivity : AppCompatActivity() {
     private fun removeBannerAd() {
         lifecycleScope.launch(Dispatchers.Main) {
             Log.d(TAG, "remove banner ad")
-            binding.bannerAdView.visibility = View.GONE
+            binding.bannerAdViewContainer.visibility = View.GONE
         }
     }
 
@@ -411,7 +418,7 @@ class MainActivity : AppCompatActivity() {
 
         RewardedAd.load(
             this,
-            SAMPLE_REWARDED_VIDEO_AD_UNIT_AD,
+            BuildConstants.REWARDED_VIDEO_AD_UNIT_AD,
             adRequest,
             object : RewardedAdLoadCallback() {
                 override fun onAdFailedToLoad(adError: LoadAdError) {

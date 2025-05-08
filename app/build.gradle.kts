@@ -25,10 +25,16 @@ android {
 
     signingConfigs {
         register("release") {
+            // add a gradle.properties file at ~/.gradle with following content
+            /*
+                HOWARD_STORE_PASSWORD=240959747
+                HOWARD_KEY_ALIAS=key0
+                HOWARD_KEY_ALIAS_PASSWORD=240959747
+             */
             storeFile = file("google-monetization.jks")
-            storePassword = "240959747"
-            keyAlias = "key0"
-            keyPassword = "240959747"
+            storePassword = project.findProperty("HOWARD_STORE_PASSWORD") as String?
+            keyAlias = project.findProperty("HOWARD_KEY_ALIAS") as String?
+            keyPassword = project.findProperty("HOWARD_KEY_ALIAS_PASSWORD") as String?
         }
     }
 

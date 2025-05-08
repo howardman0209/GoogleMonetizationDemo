@@ -41,7 +41,7 @@ android {
             /*
                 HOWARD_STORE_PASSWORD=240959747
                 HOWARD_KEY_ALIAS=key0
-                HOWARD_KEY_ALIAS_PASSWORD=240959747
+                HOWARD_KEY_PASSWORD=240959747
              */
             storeFile = file("google-monetization.jks")
             storePassword = project.findProperty("HOWARD_STORE_PASSWORD") as String?

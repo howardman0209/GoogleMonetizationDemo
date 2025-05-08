@@ -49,7 +49,6 @@ class MainActivity : AppCompatActivity() {
     private var progressStart = 0L
     private val isMobileAdsInitializeCalled = AtomicBoolean(false)
     private val googleMobileAdsConsentManager by lazy { GoogleMobileAdsConsentManager.getInstance(applicationContext) }
-    private var loadedRewardedAd: RewardedAd? = null
 
     private val productListAdapter = ProductListAdapter(object : ProductListAdapter.ProductViewListener {
         override fun onProductSelected(productDetails: ProductDetails) {
@@ -121,7 +120,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnFeatureAfterAds.setOnClickListener {
-            showRewardedVideo { rewardItem ->
+            loadAndShowRewardedAd { rewardItem ->
                 Log.d(TAG, "rewardItem: $rewardItem")
                 val rewardAmount = rewardItem.amount
                 val rewardType = rewardItem.type
@@ -371,7 +370,6 @@ class MainActivity : AppCompatActivity() {
             MobileAds.initialize(this@MainActivity) {}
             withContext(Dispatchers.Main) {
                 loadBannerAd()
-                loadRewardedAd()
             }
         }
     }
@@ -395,66 +393,66 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun loadRewardedAd(onCompleted: ((ad: RewardedAd?) -> Unit)? = null) {
-        if (loadedRewardedAd == null) {
-            val adRequest = AdRequest.Builder().build()
+    private fun loadAndShowRewardedAd(onRewardGrant: (rewardItem: RewardItem) -> Unit) {
+        showLoadingIndicator(true)
+        loadRewardedAd { loadedAd ->
+            showLoadingIndicator(false)
+            if (loadedAd == null) {
+                showToast(getString(R.string.toast_message_fail_to_load_ads))
+                return@loadRewardedAd
+            }
 
-            RewardedAd.load(
-                this,
-                SAMPLE_REWARDED_VIDEO_AD_UNIT_AD,
-                adRequest,
-                object : RewardedAdLoadCallback() {
-                    override fun onAdFailedToLoad(adError: LoadAdError) {
-                        Log.d(TAG, adError.message)
-                        loadedRewardedAd = null
-                        onCompleted?.invoke(null)
-                    }
-
-                    override fun onAdLoaded(ad: RewardedAd) {
-                        Log.d(TAG, "Ad was loaded.")
-                        loadedRewardedAd = ad
-                        onCompleted?.invoke(ad)
-                    }
-                },
-            )
+            showRewardedVideo(loadedAd, onRewardGrant)
         }
     }
 
-    private fun showRewardedVideo(onRewardGrant: (rewardItem: RewardItem) -> Unit) {
+    private fun loadRewardedAd(onCompleted: ((ad: RewardedAd?) -> Unit)? = null) {
+        val adRequest = AdRequest.Builder().build()
+
+        RewardedAd.load(
+            this,
+            SAMPLE_REWARDED_VIDEO_AD_UNIT_AD,
+            adRequest,
+            object : RewardedAdLoadCallback() {
+                override fun onAdFailedToLoad(adError: LoadAdError) {
+                    Log.d(TAG, adError.message)
+                    onCompleted?.invoke(null)
+                }
+
+                override fun onAdLoaded(ad: RewardedAd) {
+                    Log.d(TAG, "Ad was loaded.")
+                    onCompleted?.invoke(ad)
+                }
+            },
+        )
+    }
+
+    private fun showRewardedVideo(loadedRewardedAd: RewardedAd, onRewardGrant: (rewardItem: RewardItem) -> Unit) {
         lifecycleScope.launch(Dispatchers.Main) {
             val loadedAd = loadedRewardedAd
-            if (loadedAd != null) {
-                loadedAd.fullScreenContentCallback =
-                    object : FullScreenContentCallback() {
-                        override fun onAdDismissedFullScreenContent() {
-                            Log.d(TAG, "Ad was dismissed.")
-                            // Don't forget to set the ad reference to null so you
-                            // don't show the ad a second time.
-                            loadedRewardedAd = null
-                            if (googleMobileAdsConsentManager.canRequestAds) {
-                                loadRewardedAd()
-                            }
-                        }
-
-                        override fun onAdFailedToShowFullScreenContent(adError: AdError) {
-                            Log.d(TAG, "Ad failed to show.")
-                            // Don't forget to set the ad reference to null so you
-                            // don't show the ad a second time.
-                            loadedRewardedAd = null
-                        }
-
-                        override fun onAdShowedFullScreenContent() {
-                            Log.d(TAG, "Ad showed fullscreen content.")
-                            // Called when ad is dismissed.
-                        }
+            loadedAd.fullScreenContentCallback =
+                object : FullScreenContentCallback() {
+                    override fun onAdDismissedFullScreenContent() {
+                        Log.d(TAG, "Ad was dismissed.")
+                        // Don't forget to set the ad reference to null so you
+                        // don't show the ad a second time.
                     }
 
-                loadedAd.show(this@MainActivity) { rewardItem ->
-                    // Handle the reward.
-                    onRewardGrant.invoke(rewardItem)
+                    override fun onAdFailedToShowFullScreenContent(adError: AdError) {
+                        Log.d(TAG, "Ad failed to show.")
+                        // Don't forget to set the ad reference to null so you
+                        // don't show the ad a second time.
+                    }
+
+                    override fun onAdShowedFullScreenContent() {
+                        Log.d(TAG, "Ad showed fullscreen content.")
+                        // Called when ad is dismissed.
+                    }
                 }
-            } else {
-                showToast(getString(R.string.toast_message_fail_to_load_ads))
+
+            loadedAd.show(this@MainActivity) { rewardItem ->
+                // Handle the reward.
+                onRewardGrant.invoke(rewardItem)
             }
         }
     }
